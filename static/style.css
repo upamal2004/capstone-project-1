@@ -1,0 +1,33 @@
+body {
+    background-color: #121212;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+/* සින්දු පෙන්වන කාඩ් එක */
+.song-card {
+    background: #282828;
+    padding: 20px;
+    margin: 15px 0;
+    border-radius: 10px;
+    border-left: 5px solid #1DB954; /* කොළ පාට ඉරක් */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.search-section {
+    background: #181818;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+button {
+    background-color: #1DB954;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+}

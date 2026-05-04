@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Music Home</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+<body>
+    <nav style="background: #000; padding: 15px; text-align: right;">
+    <a href="/" style="color: white; margin-right: 20px; text-decoration: none;">Home</a>
+    <a href="/logout" style="color: #ff4d4d; text-decoration: none;">Logout</a>
+    </nav>
+    <div class="navbar">
+        <h1>Welcome, {{ session['username'] }}!</h1>
+        <a href="/logout" style="color: #1DB954;">Logout</a>
+    </div>
+
+    <div class="container">
+        <div class="search-section">
+            <div class="search-section" style="margin-top: 20px;">
+                <h3>Search by Song Name</h3>
+                <form action="/search" method="GET">
+                    <input type="text" name="query" placeholder="Enter song title..." style="width: 70%; padding: 10px; border-radius: 5px; border: none; color: black;">
+                    <button type="submit">Search</button>
+                </form>
+            </div>
+            <h3>Find Music by Mood</h3>
+            <form action="/recommend" method="POST">
+                <select name="genre">
+                    <option value="Pop">Pop</option>
+                    <option value="Classical">Classical</option>
+                    <option value="Rock">Rock</option>
+                </select>
+                <select name="mood">
+                    <option value="Happy">Happy (High Energy)</option>
+                    <option value="Relax">Relax (Low Energy)</option>
+                </select>
+                <button type="submit">Recommend Songs</button>
+            </form>
+        </div>
+
+        <h2>Your Recommendations</h2>
+        <div id="song-list">
+        {% for song in songs %}
+        <div class="song-card">
+            <div>
+                <strong>{{ song['title'] }}</strong><br>
+                <small>{{ song['artist'] }} | {{ song['genre'] }}</small>
+            </div>
+            <audio controls>
+                <source src="{{ url_for('static', filename='songs/' + song['file_path']) }}" type="audio/mpeg">
+            </audio>
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 50px; color: #888;">
+            <p>No songs found for your search/selection. 🎶</p>
+            <a href="/" style="color: #1DB954;">View All Songs</a>
+        </div>
+        {% endfor %}
+</div>
+    </div>
+</body>
+</html>
