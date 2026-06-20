@@ -1,0 +1,43 @@
+{% extends "base_app.html" %}
+
+{% block title %}History — MusicApp{% endblock %}
+
+{% block app_content %}
+<div class="history-header">
+    <div class="page-header" style="margin-bottom:0;">
+        <h1>Listening History</h1>
+        <p>Your recently played tracks.</p>
+    </div>
+    {% if history %}
+    <form action="/clear_history" method="POST" onsubmit="return confirm('Clear your entire listening history?');">
+        <button type="submit" class="btn btn-danger">Clear All</button>
+    </form>
+    {% endif %}
+</div>
+
+<table class="history-table">
+    <thead>
+        <tr>
+            <th>Song</th>
+            <th>Artist</th>
+            <th>Played At</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in history %}
+        <tr>
+            <td>{{ item['title'] }}</td>
+            <td>{{ item['artist'] }}</td>
+            <td class="muted">{{ item['played_at'] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if not history %}
+<div class="empty-state">
+    <p>No listening history yet</p>
+    <a href="/">Start listening</a>
+</div>
+{% endif %}
+{% endblock %}

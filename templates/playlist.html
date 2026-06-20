@@ -1,0 +1,76 @@
+{% extends "base_app.html" %}
+
+{% block title %}My Playlist — MusicApp{% endblock %}
+
+{% block app_content %}
+<div class="page-header">
+    <h1>My Playlist</h1>
+    <p>Your handpicked favorite tracks, stored in one place.</p>
+</div>
+
+<div class="song-grid">
+    {% for song in songs %}
+    <div class="song-card">
+        <div class="song-cover">
+            {% set mood = 'happy' if song['energy'] >= 0.5 else 'relax' %}
+            {% if song['genre'] in ('Pop', 'Rock', 'Classical') %}
+                <img src="{{ url_for('static', filename='images/' ~ song['genre'] ~ ' ' ~ mood ~ '.jpg') }}" alt="{{ song['genre'] }}" class="cover-img">
+            {% else %}
+                <div class="cover-fallback">♪</div>
+            {% endif %}
+        </div>
+        <div class="song-info">
+            <span class="song-title">{{ song['title'] }}</span>
+            <span class="song-artist">{{ song['artist'] }}</span>
+            <span class="song-genre">{{ song['genre'] }}</span>
+        </div>
+        <div class="song-audio-player">
+            <audio id="audio-{{ loop.index }}">
+                <source src="{{ url_for('static', filename='songs/' + song['file_path']) }}" type="audio/mpeg">
+            </audio>
+            <button class="btn-play" onclick="togglePlay('audio-{{ loop.index }}', this, '{{ song['id'] }}')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            <form action="/remove_from_playlist/{{ song['id'] }}" method="POST" style="margin:0 0 0 auto;">
+                <button type="submit" class="btn btn-danger" style="padding:6px 14px; font-size:0.78rem;">Remove</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>Your playlist is empty</p>
+        <a href="/">Browse Songs</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block body %}
+{{ super() }}
+<script>
+function togglePlay(audioId, btn, songId) {
+    var audio = document.getElementById(audioId);
+    var allAudios = document.querySelectorAll('audio');
+    var allButtons = document.querySelectorAll('.btn-play');
+    allAudios.forEach(function(a) { if (a !== audio) a.pause(); });
+    allButtons.forEach(function(b) {
+        if (b !== btn) {
+            b.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+        }
+    });
+
+    if (audio.paused) {
+        audio.play();
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+        fetch('/add_to_history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ song_id: songId })
+        });
+    } else {
+        audio.pause();
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,345 @@
+{% extends "base_app.html" %}
+
+{% block title %}Profile — MusicApp{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block app_content %}
+<div class="page-header">
+    <h1>Your Listening Profile</h1>
+    <p>Content-based analysis of your music preferences in real-time.</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-card-label">Total Songs Played</div>
+        <div class="stat-card-value">{{ total_played }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-label">Your Top Genre</div>
+        <div class="stat-card-value">{% if top_genre %}{{ top_genre['genre'] }}{% else %}N/A{% endif %}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-label">Dominant Mood</div>
+        <div class="stat-card-value">{% if top_mood %}{{ top_mood['mood_type'] }}{% else %}N/A{% endif %}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-label">Average Listening Energy</div>
+        <div class="stat-card-value">{{ avg_energy }}</div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-section">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            Genre Distribution
+        </h3>
+        <canvas id="genrePieChart"></canvas>
+    </div>
+
+    <div class="chart-section">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            7-Day Listening Trend
+        </h3>
+        <canvas id="trendChart"></canvas>
+    </div>
+
+    <div class="chart-section">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-6"/></svg>
+            Genre vs Mood Correlation
+        </h3>
+        <canvas id="correlationChart"></canvas>
+    </div>
+
+    <div class="chart-section">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Recently Played
+        </h3>
+        <div class="recent-songs">
+            {% for item in recent %}
+            <div class="recent-row">
+                <div class="recent-info">
+                    <span class="recent-title">{{ item['title'] }}</span>
+                    <span class="recent-artist">{{ item['artist'] }}</span>
+                </div>
+                <span class="recent-time">{{ item['played_at'][:10] }}</span>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding:20px 0;">
+                <p>No songs played yet</p>
+                <a href="/">Start listening</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="chart-section" style="margin-top: 24px; width: 100%;">
+    <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-6"/><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+        Daily Vibe &amp; Genre Evolution
+    </h3>
+    <canvas id="dailyChart"></canvas>
+</div>
+
+<div class="chart-section" style="margin-top: 24px; width: 100%;">
+    <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Playlist Insights
+    </h3>
+    <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:16px;">Genre breakdown of your saved songs</p>
+    {% if pl_genres %}
+    <div style="display:flex; align-items:center; gap:24px; flex-wrap:wrap;">
+        <div style="flex:0 0 280px;">
+            <canvas id="playlistGenreChart"></canvas>
+        </div>
+        <div style="flex:1; min-width:160px;">
+            {% for g in pl_genres %}
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <span style="width:12px; height:12px; border-radius:50%; display:inline-block; background:{{ ['#1DB954','#E74C3C','#3498DB','#F39C12','#9B59B6','#1ABC9C','#E67E22','#2ECC71'][loop.index0 % 8] }};"></span>
+                <span style="flex:1; color:var(--text-primary);">{{ g }}</span>
+                <span style="color:var(--text-secondary);">{{ pl_counts[loop.index0] }} songs</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);">Your playlist is empty. <a href="/">Browse songs</a></p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block body %}
+{{ super() }}
+<script>
+// Chart colors
+var colors = ['#1DB954', '#128C7E', '#3498db', '#9b59b6', '#e67e22', '#e74c3c', '#f1c40f'];
+var textColor = '#b3b3b3';
+var gridColor = 'rgba(255,255,255,0.06)';
+
+// 1. Genre Pie Chart
+new Chart(document.getElementById('genrePieChart'), {
+    type: 'pie',
+    data: {
+        labels: {{ chart_labels | tojson }},
+        datasets: [{
+            data: {{ chart_data | tojson }},
+            backgroundColor: colors,
+            borderColor: '#121212',
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { color: textColor, padding: 16, font: { family: 'Inter', size: 12 } }
+            }
+        }
+    }
+});
+
+// 2. Weekly Trend Line Chart
+new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+        labels: {{ trend_labels | tojson }},
+        datasets: [{
+            label: 'Songs Played',
+            data: {{ trend_data | tojson }},
+            borderColor: '#1DB954',
+            backgroundColor: 'rgba(29, 185, 84, 0.08)',
+            fill: true,
+            tension: 0.35,
+            pointBackgroundColor: '#1DB954',
+            pointBorderColor: '#121212',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            x: {
+                ticks: { color: textColor, font: { family: 'Inter', size: 11 } },
+                grid: { color: gridColor }
+            },
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    color: textColor,
+                    font: { family: 'Inter', size: 11 },
+                    stepSize: 1
+                },
+                grid: { color: gridColor }
+            }
+        },
+        plugins: {
+            legend: { display: false }
+        }
+    }
+});
+
+// 3. Genre vs Mood Correlation — Stacked Bar Chart
+new Chart(document.getElementById('correlationChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ corr_genres | tojson }},
+        datasets: [
+            {
+                label: 'Happy / High Energy',
+                data: {{ corr_happy | tojson }},
+                backgroundColor: '#1DB954',
+                borderRadius: 0
+            },
+            {
+                label: 'Chill / Relax',
+                data: {{ corr_chill | tojson }},
+                backgroundColor: '#3498db',
+                borderRadius: 0
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            x: {
+                stacked: true,
+                ticks: { color: textColor, font: { family: 'Inter', size: 11 } },
+                grid: { display: false }
+            },
+            y: {
+                stacked: true,
+                beginAtZero: true,
+                ticks: {
+                    color: textColor,
+                    font: { family: 'Inter', size: 11 },
+                    stepSize: 1
+                },
+                grid: { color: gridColor }
+            }
+        },
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    color: textColor,
+                    padding: 16,
+                    font: { family: 'Inter', size: 12 },
+                    usePointStyle: true
+                }
+            }
+        }
+    }
+});
+
+// 4. Daily Vibe & Genre Evolution — Multi-Axis Line Chart
+var dailyCtx = document.getElementById('dailyChart');
+if (dailyCtx) {
+    var dailyLabels = {{ daily_dates | tojson }};
+    new Chart(dailyCtx, {
+        type: 'line',
+        data: {
+            labels: dailyLabels,
+            datasets: [{
+                label: 'Avg Mood Score',
+                data: {{ daily_energies | tojson }},
+                borderColor: '#1DB954',
+                backgroundColor: 'rgba(29, 185, 84, 0.1)',
+                fill: true,
+                tension: 0.35,
+                pointBackgroundColor: '#1DB954',
+                pointBorderColor: '#121212',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 8,
+                yAxisID: 'y'
+            }]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            scales: {
+                x: {
+                    ticks: { color: textColor, font: { family: 'Inter', size: 11 } },
+                    grid: { color: gridColor }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 1,
+                    ticks: {
+                        color: textColor,
+                        font: { family: 'Inter', size: 11 },
+                        callback: function(v) { return (v * 100).toFixed(0) + '%'; }
+                    },
+                    grid: { color: gridColor }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: textColor,
+                        padding: 16,
+                        font: { family: 'Inter', size: 12 },
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#1A1A1A',
+                    titleColor: '#fff',
+                    bodyColor: '#b3b3b3',
+                    borderColor: '#2a2a2a',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                    callbacks: {
+                        afterBody: function(tooltipItems) {
+                            var idx = tooltipItems[0].dataIndex;
+                            return 'Top Genre: ' + ({{ daily_genres | tojson }})[idx];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+
+<script>
+// Playlist Genre Doughnut Chart
+if (document.getElementById('playlistGenreChart')) {
+    var plColors = ['#1DB954', '#E74C3C', '#3498DB', '#F39C12', '#9B59B6', '#1ABC9C', '#E67E22', '#2ECC71'];
+    new Chart(document.getElementById('playlistGenreChart'), {
+        type: 'doughnut',
+        data: {
+            labels: {{ pl_genres | tojson }},
+            datasets: [{
+                data: {{ pl_counts | tojson }},
+                backgroundColor: plColors,
+                borderColor: '#121212',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '65%',
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

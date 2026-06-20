@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ song['title'] }} — MusicApp</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { margin: 0; overflow: hidden; }
+        .main-container { flex: 1; display: flex; padding: 40px; max-width: 1400px; margin: 0 auto; gap: 40px; box-sizing: border-box; }
+        .player-section { flex: 0 0 60%; display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .album-art { max-width: 380px; width: 100%; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+        .song-details { margin-top: 25px; }
+        .song-title { font-size: 2.2rem; font-weight: 700; margin: 0; }
+        .song-artist { color: #b3b3b3; font-size: 1.1rem; margin: 5px 0 0 0; }
+        .controls-container { width: 100%; max-width: 500px; margin-top: 30px; }
+        .timeline-box { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 20px; }
+        .time-stamp { font-size: 0.85rem; color: #a7a7a7; width: 45px; }
+        input[type="range"] { flex: 1; accent-color: #1db954; cursor: pointer; }
+        .buttons-box { display: flex; justify-content: center; align-items: center; gap: 25px; }
+        .nav-btn { background: none; border: none; color: #b3b3b3; font-size: 1.2rem; cursor: pointer; transition: color 0.2s; }
+        .nav-btn:hover { color: white; }
+        .play-btn { background-color: #1db954; color: white; border: none; border-radius: 50%; width: 55px; height: 55px; font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
+        .play-btn:hover { transform: scale(1.05); }
+        .recommendations-section { flex: 0 0 40%; background: #181818; padding: 24px; border-radius: 12px; height: fit-content; box-sizing: border-box; }
+        .rec-title { font-size: 1.3rem; font-weight: 700; margin-top: 0; margin-bottom: 20px; }
+        .rec-list { display: flex; flex-direction: column; gap: 12px; }
+        .rec-item { display: flex; align-items: center; gap: 15px; padding: 10px; border-radius: 8px; background: #202020; text-decoration: none; color: white; transition: background 0.2s; }
+        .rec-item:hover { background: #282828; }
+        .rec-img { width: 50px; height: 50px; border-radius: 6px; object-fit: cover; }
+        .rec-info { flex: 1; display: flex; flex-direction: column; }
+        .rec-name { font-weight: 600; font-size: 0.95rem; margin: 0; }
+        .rec-artist { color: #b3b3b3; font-size: 0.85rem; margin: 2px 0 0 0; }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="MusicApp" class="logo-img">
+                    <span class="logo-text">MusicApp</span>
+                </div>
+            </div>
+
+            <div class="user-badge">
+                <div class="avatar">{{ session['username'][0]|upper }}</div>
+                <span class="username">{{ session['username'] }}</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Home
+                </a>
+                <a href="/profile" class="nav-item {% if request.path == '/profile' %}active{% endif %}">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+                    Profile
+                </a>
+                <a href="/playlist" class="nav-item {% if request.path == '/playlist' %}active{% endif %}">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    Playlist
+                </a>
+                <a href="/history" class="nav-item {% if request.path == '/history' %}active{% endif %}">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    History
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="/logout" class="nav-item logout-link">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Logout
+                </a>
+            </div>
+        </aside>
+
+        <div class="main-container">
+        <div class="player-section">
+            {% set mood = 'happy' if song['energy'] >= 0.5 else 'relax' %}
+            {% if song['genre'] in ('Pop', 'Rock', 'Classical') %}
+                <img class="album-art" src="{{ url_for('static', filename='images/' ~ song['genre'] ~ ' ' ~ mood ~ '.jpg') }}" alt="Album Art">
+            {% else %}
+                <div style="width:380px; height:380px; max-width:100%; border-radius:12px; background:linear-gradient(135deg,#1DB954,#128C7E); display:flex; align-items:center; justify-content:center; font-size:5rem;">♪</div>
+            {% endif %}
+            <div class="song-details">
+                <h1 class="song-title">{{ song['title'] }}</h1>
+                <p class="song-artist">{{ song['artist'] }}</p>
+                <small style="color: #888;">{{ song['genre'] }} · {{ (song['energy'] * 100) | int }}% energy</small>
+                <button class="add-to-playlist-btn" data-song-id="{{ song['id'] }}" style="background:none; border:1px solid #333; color:#b3b3b3; padding:8px 16px; border-radius:20px; cursor:pointer; font-size:0.85rem; transition:all 0.2s; margin-top:12px;" onmouseover="this.style.borderColor='#1DB954'; this.style.color='#1DB954';" onmouseout="this.style.borderColor='#333'; this.style.color='#b3b3b3';">
+                    <i class="fas fa-plus"></i> Add to Playlist
+                </button>
+            </div>
+
+            <div class="controls-container">
+                <audio id="main-audio" autoplay></audio>
+
+                <div class="timeline-box">
+                    <span class="time-stamp" id="current-time">0:00</span>
+                    <input type="range" id="progress-bar" value="0" min="0" max="100">
+                    <span class="time-stamp" id="total-time">0:00</span>
+                </div>
+
+                <div class="buttons-box">
+                    <button class="nav-btn" id="prev-btn"><i class="fas fa-backward"></i></button>
+                    <button class="play-btn" id="play-pause-btn"><i class="fas fa-pause"></i></button>
+                    <button class="nav-btn" id="next-btn"><i class="fas fa-forward"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <div class="recommendations-section">
+            <h3 class="rec-title">Up Next / Recommended for You</h3>
+            <div class="rec-list">
+                {% for rec in recommendations %}
+                <a href="/player/{{ rec['id'] }}" class="rec-item">
+                    {% set rec_mood = 'happy' if rec['energy'] >= 0.5 else 'relax' %}
+                    {% if rec['genre'] in ('Pop', 'Rock', 'Classical') %}
+                        <img class="rec-img" src="{{ url_for('static', filename='images/' ~ rec['genre'] ~ ' ' ~ rec_mood ~ '.jpg') }}" alt="cover">
+                    {% else %}
+                        <div style="width:50px; height:50px; border-radius:6px; background:linear-gradient(135deg,#1DB954,#128C7E); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:1.2rem;">♪</div>
+                    {% endif %}
+                    <div class="rec-info">
+                        <p class="rec-name">{{ rec['title'] }}</p>
+                        <p class="rec-artist">{{ rec['artist'] }}</p>
+                    </div>
+                    <i class="fas fa-play" style="color:#1db954; font-size:0.9rem;"></i>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const audio = document.getElementById('main-audio');
+            const playBtn = document.getElementById('play-pause-btn');
+            const progressBar = document.getElementById('progress-bar');
+            const currentTimeTxt = document.getElementById('current-time');
+            const totalTimeTxt = document.getElementById('total-time');
+            const nextBtn = document.getElementById('next-btn');
+
+            let rawSrc = "{{ url_for('static', filename='songs/' + song['file_path']) }}";
+            if (!rawSrc || rawSrc.trim() === "" || rawSrc.includes("undefined")) {
+                audio.src = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+            } else {
+                audio.src = rawSrc;
+            }
+
+            audio.onerror = function() {
+                console.log("Custom audio file failed to load. Switching to reliable fallback stream...");
+                audio.src = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+                audio.load();
+                audio.play().catch(e => console.log("Autoplay standby"));
+            };
+
+            function formatTime(secs) {
+                if (isNaN(secs)) return "0:00";
+                let m = Math.floor(secs / 60);
+                let s = Math.floor(secs % 60);
+                return m + ":" + (s < 10 ? "0" : "") + s;
+            }
+
+            audio.onloadedmetadata = () => {
+                totalTimeTxt.innerText = formatTime(audio.duration);
+            };
+
+            playBtn.onclick = function() {
+                if (audio.paused) {
+                    audio.play();
+                    playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                } else {
+                    audio.pause();
+                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                }
+            };
+
+            audio.ontimeupdate = () => {
+                if (audio.duration && !isNaN(audio.duration)) {
+                    progressBar.value = (audio.currentTime / audio.duration) * 100;
+                    currentTimeTxt.innerText = formatTime(audio.currentTime);
+                }
+            };
+
+            progressBar.oninput = () => {
+                if (audio.duration && !isNaN(audio.duration)) {
+                    audio.currentTime = (progressBar.value / 100) * audio.duration;
+                }
+            };
+
+            function goToNextRecommendedSong() {
+                const firstRecItem = document.querySelector('.rec-list .rec-item');
+                if (firstRecItem && firstRecItem.href) {
+                    console.log("Navigating to next recommended song:", firstRecItem.href);
+                    window.location.href = firstRecItem.href;
+                } else {
+                    window.location.href = '/';
+                }
+            }
+
+            if (nextBtn) {
+                nextBtn.onclick = goToNextRecommendedSong;
+            }
+
+            audio.onended = () => {
+                console.log("Song finished. Moving to next track...");
+                goToNextRecommendedSong();
+            };
+        });
+    </script>
+
+    <script>
+        document.querySelectorAll('.add-to-playlist-btn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const songId = this.getAttribute('data-song-id');
+                fetch(`/add_to_playlist/${songId}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.innerHTML = '<i class="fas fa-check"></i> Added';
+                        this.style.borderColor = '#1DB954';
+                        this.style.color = '#1DB954';
+                    }
+                })
+                .catch(err => console.error(err));
+            });
+        });
+    </script>
+</body>
+</html>

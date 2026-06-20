@@ -1,64 +1,137 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Music Home</title>
+{% extends "base_app.html" %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% block title %}Home — MusicApp{% endblock %}
 
-</head>
-<body>
-    <nav style="background: #000; padding: 15px; text-align: right;">
-    <a href="/" style="color: white; margin-right: 20px; text-decoration: none;">Home</a>
-    <a href="/logout" style="color: #ff4d4d; text-decoration: none;">Logout</a>
-    </nav>
-    <div class="navbar">
-        <h1>Welcome, {{ session['username'] }}!</h1>
-        <a href="/logout" style="color: #1DB954;">Logout</a>
-    </div>
-
-    <div class="container">
+{% block app_content %}
+<div class="hero-banner">
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+        <h1 class="hero-title">Discover Your Sound</h1>
+        <p class="hero-subtitle">Explore our curated collection and instantly find the perfect tracks analyzed to match your mood.</p>
         <div class="search-section">
-            <div class="search-section" style="margin-top: 20px;">
-                <h3>Search by Song Name</h3>
-                <form action="/search" method="GET">
-                    <input type="text" name="query" placeholder="Enter song title..." style="width: 70%; padding: 10px; border-radius: 5px; border: none; color: black;">
-                    <button type="submit">Search</button>
-                </form>
-            </div>
-            <h3>Find Music by Mood</h3>
-            <form action="/recommend" method="POST">
-                <select name="genre">
-                    <option value="Pop">Pop</option>
-                    <option value="Classical">Classical</option>
-                    <option value="Rock">Rock</option>
-                </select>
-                <select name="mood">
-                    <option value="Happy">Happy (High Energy)</option>
-                    <option value="Relax">Relax (Low Energy)</option>
-                </select>
-                <button type="submit">Recommend Songs</button>
+            <form class="search-form" action="/search" method="GET">
+                <button type="submit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </button>
+                <input type="text" name="query" placeholder="What do you want to listen to?" autocomplete="off" required>
             </form>
         </div>
-
-        <h2>Your Recommendations</h2>
-        <div id="song-list">
-        {% for song in songs %}
-        <div class="song-card">
-            <div>
-                <strong>{{ song['title'] }}</strong><br>
-                <small>{{ song['artist'] }} | {{ song['genre'] }}</small>
+        <div class="mood-filter mood-filter-banner">
+            <div class="mood-filter-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                Find Music by Mood
             </div>
-            <audio controls>
-                <source src="{{ url_for('static', filename='songs/' + song['file_path']) }}" type="audio/mpeg">
-            </audio>
+            <div class="mood-filter-options">
+                <form action="/recommend" method="GET" style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+                    <select name="genre" class="mood-select">
+                        <option value="Pop">Pop</option>
+                        <option value="Rock">Rock</option>
+                        <option value="Classical">Classical</option>
+                    </select>
+                    <select name="mood" class="mood-select">
+                        <option value="high">Happy (High Energy)</option>
+                        <option value="low">Relax (Low Energy)</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary">Recommend</button>
+                </form>
+            </div>
         </div>
-        {% else %}
-        <div style="text-align: center; padding: 50px; color: #888;">
-            <p>No songs found for your search/selection. 🎶</p>
-            <a href="/" style="color: #1DB954;">View All Songs</a>
-        </div>
-        {% endfor %}
-</div>
     </div>
-</body>
-</html>
+</div>
+
+{% if time_songs %}
+<hr class="section-divider">
+<h2 style="font-size:1.4rem; font-weight:700; margin-bottom:6px;">{{ time_title }}</h2>
+<p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:20px;">Curated picks for this time of day</p>
+<div class="song-grid">
+    {% for song in time_songs %}
+    <div class="song-card">
+        <div class="song-cover">
+            {% set mood = 'happy' if song['energy'] >= 0.5 else 'relax' %}
+            {% if song['genre'] in ('Pop', 'Rock', 'Classical') %}
+                <img src="{{ url_for('static', filename='images/' ~ song['genre'] ~ ' ' ~ mood ~ '.jpg') }}" alt="{{ song['genre'] }}" class="cover-img">
+            {% else %}
+                <div class="cover-fallback">♪</div>
+            {% endif %}
+            <div class="play-overlay">
+                <button class="btn-play" onclick="location.href='/player/{{ song['id'] }}'">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="song-info">
+            <a href="/player/{{ song['id'] }}" class="song-title" style="text-decoration:none; color:inherit;">{{ song['title'] }}</a>
+            <span class="song-artist">{{ song['artist'] }}</span>
+            <span class="song-genre">{{ song['genre'] }}</span>
+        </div>
+        <div class="song-card-actions">
+            <button class="btn-play" onclick="location.href='/player/{{ song['id'] }}'">
+                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            <button class="playlist-add-btn add-to-playlist-btn" data-song-id="{{ song['id'] }}" title="Add to playlist">+</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h2 style="font-size:1.4rem; font-weight:700; margin-bottom:6px;">Recommended for You</h2>
+<p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:20px;">{% if personalized %}Based on your recent listening habits{% else %}Browse our full collection{% endif %}</p>
+
+<div class="song-grid">
+    {% for song in songs %}
+    <div class="song-card">
+        <div class="song-cover">
+            {% set mood = 'happy' if song['energy'] >= 0.5 else 'relax' %}
+            {% if song['genre'] in ('Pop', 'Rock', 'Classical') %}
+                <img src="{{ url_for('static', filename='images/' ~ song['genre'] ~ ' ' ~ mood ~ '.jpg') }}" alt="{{ song['genre'] }}" class="cover-img">
+            {% else %}
+                <div class="cover-fallback">♪</div>
+            {% endif %}
+            <div class="play-overlay">
+                <button class="btn-play" onclick="location.href='/player/{{ song['id'] }}'">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="song-info">
+            <a href="/player/{{ song['id'] }}" class="song-title" style="text-decoration:none; color:inherit;">{{ song['title'] }}</a>
+            <span class="song-artist">{{ song['artist'] }}</span>
+            <span class="song-genre">{{ song['genre'] }}</span>
+        </div>
+        <div class="song-card-actions">
+            <button class="btn-play" onclick="location.href='/player/{{ song['id'] }}'">
+                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            <button class="playlist-add-btn add-to-playlist-btn" data-song-id="{{ song['id'] }}" title="Add to playlist">+</button>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No songs found</p>
+        <a href="/">Browse all songs</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block body %}
+{{ super() }}
+<script>
+document.querySelectorAll('.add-to-playlist-btn').forEach(button => {
+    button.addEventListener('click', function(e) {
+        e.preventDefault();
+        const songId = this.getAttribute('data-song-id');
+        fetch(`/add_to_playlist/${songId}`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.textContent = '✓';
+                this.style.color = '#1DB954';
+            }
+        })
+        .catch(err => console.error(err));
+    });
+});
+</script>
+{% endblock %}
