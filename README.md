@@ -93,3 +93,13 @@ melodyhub/
 ## License
 
 MIT
+
+---
+
+## 👨‍💻 Developed By
+
+- **Name:** Upamal De Silva
+- **Student ID:** 23CDS0842
+- **Course:** Data Science (Sabaragamuwa University of Sri Lanka)
+- **GitHub Profile:** [@upamal2004](https://github.com/upamal2004)
+- **LinkedIn Profile:** www.linkedin.com/in/upamal-de-silva-337918383
