@@ -12,10 +12,10 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())
 
-# Database එකට සම්බන්ධ වෙන function එක
+# Database connection function
 def get_db_connection():
     conn = sqlite3.connect('music.db')
-    conn.row_factory = sqlite3.Row # මේකෙන් අපිට column names පාවිච්චි කරන්න පුළුවන්
+    conn.row_factory = sqlite3.Row # This allows us to use column names directly
     return conn
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -46,19 +46,19 @@ def register():
         
         conn = get_db_connection()
         try:
-            # යූසර්ව ඩේටාබේස් එකට ඇතුළත් කරනවා
+            # Insert the user into the database
             hashed = generate_password_hash(password)
             conn.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hashed))
             conn.commit()
             conn.close()
-            return redirect('/login') # රෙජිස්ටර් වුණාම ලොගින් පේජ් එකට යවනවා
+            return redirect('/login') # Redirect to login page after successful registration
         except sqlite3.IntegrityError:
             return render_template('register.html', error="This username is already taken. Please choose another.")
             
     return render_template('register.html')
 
 
-# Home page එක
+# Home page
 @app.route('/')
 def home():
     if 'user_id' not in session:
@@ -131,7 +131,7 @@ def search_song():
     query = request.args.get('query')
     
     conn = get_db_connection()
-    # සින්දුවේ නම ඇතුළේ අපි සර්ච් කරන වචනය තියෙනවද කියලා බලනවා (LIKE operator)
+    # Search for songs whose title matches the query (LIKE operator)
     songs = conn.execute("SELECT * FROM songs WHERE title LIKE ?", ('%' + query + '%',)).fetchall()
     conn.close()
     
@@ -143,7 +143,7 @@ def view_history():
         return redirect('/login')
     
     conn = get_db_connection()
-    # යූසර්ගේ හිස්ට්‍රි එක සහ සින්දුවේ විස්තර Join කරලා ගන්නවා
+    # Fetch user's history with song details via JOIN
     history = conn.execute('''
         SELECT songs.title, songs.artist, history.played_at 
         FROM history 
@@ -155,7 +155,7 @@ def view_history():
     
     return render_template('history.html', history=history)
 
-# 3. 🎯 Play බටන් එක ඔබද්දී Background එකෙන් හිස්ට්‍රි සේව් කරන්න අලුත් Endpoint එක
+# 3. Endpoint to save history in the background when play button is pressed
 @app.route('/add_to_history', methods=['POST'])
 def add_to_history():
     if 'user_id' not in session:
@@ -231,7 +231,7 @@ def profile_analysis():
     conn = get_db_connection()
     user_id = session['user_id']
     
-    # 1. හැම Genre එකකම Play Count එක ගන්නවා (Pie Chart එක සඳහා)
+    # 1. Get play count for each genre (for Pie Chart)
     genre_stats = conn.execute('''
         SELECT songs.genre, COUNT(history.id) as play_count 
         FROM history 
@@ -240,11 +240,11 @@ def profile_analysis():
         GROUP BY songs.genre
     ''', (user_id,)).fetchall()
     
-    # JavaScript එකට ලේසියෙන් ගන්න පුළුවන් වෙන්න දත්ත ටික ලැයිස්තු (Lists) දෙකකට කඩනවා
+    # Split data into two lists for JavaScript
     chart_labels = [row['genre'] for row in genre_stats]
     chart_data = [row['play_count'] for row in genre_stats]
     
-    # 2. යූසර් වැඩිපුරම කැමති Genre එක (Top Card එක සඳහා)
+    # 2. User's most listened genre (for Top Card)
     top_genre = conn.execute('''
         SELECT songs.genre, COUNT(history.id) as play_count 
         FROM history 
@@ -254,7 +254,7 @@ def profile_analysis():
         ORDER BY play_count DESC LIMIT 1
     ''', (user_id,)).fetchone()
     
-    # 3. යූසර් වැඩිපුරම හිටපු Mood එක
+    # 3. User's dominant mood type
     top_mood = conn.execute('''
         SELECT 
             CASE WHEN songs.energy > 0.6 THEN 'Happy / High Energy' ELSE 'Relax / Low Energy' END as mood_type,
@@ -266,7 +266,7 @@ def profile_analysis():
         ORDER BY mood_count DESC LIMIT 1
     ''', (user_id,)).fetchone()
     
-    # 4. මුළු සින්දු ගණන
+    # 4. Total songs played count
     total_played = conn.execute('SELECT COUNT(*) FROM history WHERE user_id = ?', (user_id,)).fetchone()[0]
     
     # 5. Average listening energy
@@ -386,7 +386,7 @@ def profile_analysis():
                             pl_genres=pl_genres,
                             pl_counts=pl_counts)
 
-# 1. ප්ලේලිස්ට් එකට සින්දු එකතු කරන Endpoint එක
+# 1. Add song to playlist endpoint
 @app.route('/add_to_playlist/<int:song_id>', methods=['POST'])
 def add_to_playlist(song_id):
     if 'user_id' not in session:
@@ -395,7 +395,7 @@ def add_to_playlist(song_id):
     user_id = session['user_id']
     conn = get_db_connection()
     
-    # සින්දුව දැනටමත් ප්ලේලිස්ට් එකේ තියෙනවද බලනවා (Duplicate නොවෙන්න)
+    # Check if the song is already in the playlist (prevent duplicates)
     existing = conn.execute('SELECT * FROM playlists WHERE user_id = ? AND song_id = ?', 
                             (user_id, song_id)).fetchone()
     
@@ -406,14 +406,14 @@ def add_to_playlist(song_id):
     conn.close()
     return jsonify({'success': True, 'message': 'Song added to playlist'})
 
-# 2. යූසර්ගේ ප්ලේලිස්ට් එක පෙන්වන Route එක
+# 2. View user's playlist route
 @app.route('/playlist')
 def view_playlist():
     if 'user_id' not in session:
         return redirect('/login')
         
     conn = get_db_connection()
-    # යූසර් එකතු කරපු සින්දු ටික විතරක් JOIN එකකින් ගන්නවා
+    # Fetch only the songs the user has added, using a JOIN
     playlist_songs = conn.execute('''
         SELECT songs.* FROM playlists 
         JOIN songs ON playlists.song_id = songs.id 
@@ -431,12 +431,12 @@ def remove_from_playlist(song_id):
     user_id = session['user_id']
     conn = get_db_connection()
     
-    # යූසර්ගේ ප්ලේලිස්ට් එකෙන් අදාළ සින්දුව විතරක් Delete කරනවා
+    # Delete only the relevant song from the user's playlist
     conn.execute('DELETE FROM playlists WHERE user_id = ? AND song_id = ?', (user_id, song_id))
     conn.commit()
     conn.close()
     
-    return redirect('/playlist') # අයින් වුණාට පස්සේ ආපහු ප්ලේලිස්ට් පේජ් එකටම රිෆ්‍රෙෂ් වෙනවා
+    return redirect('/playlist') # Redirect back to the playlist page after removal
 
 @app.route('/clear_history', methods=['POST'])
 def clear_history():
@@ -446,12 +446,12 @@ def clear_history():
     user_id = session['user_id']
     conn = get_db_connection()
     
-    # ඩේටාබේස් එකේ history ටේබල් එකෙන් මේ යූසර්ට අදාළ ඔක්කොම දත්ත Delete කරනවා
+    # Delete all history records for this user from the database
     conn.execute('DELETE FROM history WHERE user_id = ?', (user_id,))
     conn.commit()
     conn.close()
     
-    return redirect('/history') # මැකුණට පස්සේ ආපහු හිස්ට්‍රි පේජ් එකටම රිෆ්‍රෙෂ් වෙනවා
+    return redirect('/history') # Redirect back to the history page after clearing
 
 @app.route('/logout')
 def logout():
@@ -496,18 +496,18 @@ def player(song_id):
     return render_template('player.html', song=song, recommendations=recommendations)
 
 if __name__ == '__main__':
-    # සාම්පල් යූසර් කෙනෙක්ව ඇඩ් කරමු
+    # Create sample user accounts
     conn = sqlite3.connect('music.db')
     cursor = conn.cursor()
     try:
-        # මම මෙතන Username එකට 'admin' සහ Password එකට '1234' දානවා
+        # Set username 'admin' with password '1234'
         hashed = generate_password_hash('1234')
         cursor.execute("INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)", ('admin', hashed))
         cursor.execute("INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)", ('test', hashed))
         conn.commit()
-        print("සාම්පල් යූසර් (admin, 1234) සාර්ථකව ඇඩ් කළා!")
+        print("Sample users (admin, 1234) created successfully!")
     except Exception as e:
-        print("යූසර් ඇඩ් කරන්න බැරි වුණා:", e)
+        print("Failed to create sample users:", e)
     finally:
         conn.close()
 
