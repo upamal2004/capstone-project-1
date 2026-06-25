@@ -304,19 +304,31 @@
         }
     }
 
-    playBtn.addEventListener('click', function() {
+    function handlePlayClick(e) {
+        e.preventDefault();
         if (audio.paused) {
             audio.play();
         } else {
             audio.pause();
         }
-    });
+    }
+
+    playBtn.addEventListener('click', handlePlayClick);
+    playBtn.addEventListener('touchstart', handlePlayClick, { passive: false });
 
     audio.addEventListener('play', function() {
         updatePlayBtn();
         playerBar.classList.add('is-playing');
         document.body.classList.add('is-playing');
         localStorage.setItem('audio_playing', 'true');
+        // Record history on every play
+        if (currentSong && currentSong.id) {
+            fetch('/add_to_history', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({song_id: currentSong.id})
+            }).catch(function(err) { console.error('History recording failed:', err); });
+        }
     });
 
     audio.addEventListener('pause', function() {
