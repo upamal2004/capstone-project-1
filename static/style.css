@@ -3122,6 +3122,7 @@ html, body {
     padding: 15px 20px !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
+    padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 .player-main,
@@ -3210,7 +3211,8 @@ body:has(.player-page-container) {
 }
 
 .main-content:has(.player-page-container) {
-    overflow-y: hidden !important;
+    overflow-y: auto !important;
+    padding: 0 !important;
 }
 
 /* ---------- Solid Dark Overrides ---------- */
