@@ -4,26 +4,49 @@
 
 {% block body %}
 <div class="auth-page">
-    <div class="auth-card">
-        <div class="auth-logo">
-            <span class="logo-icon">♪</span>
-            MusicApp
+    <div class="auth-split">
+        <div class="auth-promo">
+            <div class="auth-logo">
+                <span class="logo-icon">♪</span>
+                MusicApp
+            </div>
+            <h2 class="promo-heading">Your Music,<br>Reimagined.</h2>
+            <ul class="promo-list">
+                <li>
+                    <span class="promo-icon" style="color:#00ff66;">▶</span>
+                    <div><strong>Persistent Audio Player</strong><br><span class="promo-desc">Never stop the music — seamless playback across every page.</span></div>
+                </li>
+                <li>
+                    <span class="promo-icon" style="color:#00ff66;">♡</span>
+                    <div><strong>Smart Like / Dislike</strong><br><span class="promo-desc">Train your recommendations with one tap.</span></div>
+                </li>
+                <li>
+                    <span class="promo-icon" style="color:#00ff66;">≡</span>
+                    <div><strong>Dynamic Playlists</strong><br><span class="promo-desc">Create, organize, and discover your perfect sets.</span></div>
+                </li>
+                <li>
+                    <span class="promo-icon" style="color:#00ff66;">📊</span>
+                    <div><strong>Rich Analytics</strong><br><span class="promo-desc">Visualize your taste with genre trends and mood charts.</span></div>
+                </li>
+            </ul>
         </div>
-        <p class="auth-subtitle">Welcome back. Sign in to continue.</p>
+        <div class="auth-card">
+            <p class="auth-subtitle">Welcome back. Sign in to continue.</p>
 
-        {% if error %}
-        <div class="alert alert-error">{{ error }}</div>
-        {% endif %}
+            {% if error %}
+            <div class="alert alert-error">{{ error }}</div>
+            {% endif %}
 
-        <form class="auth-form" action="/login" method="POST">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit" class="btn btn-primary">Sign In</button>
-        </form>
+            <form class="auth-form" action="/login" method="POST">
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit" class="btn btn-primary">Sign In</button>
+            </form>
 
-        <p class="auth-footer">
-            Don't have an account? <a href="/register">Create one</a>
-        </p>
+            <p class="auth-footer">
+                Don't have an account? <a href="/register">Create one</a>
+            </p>
+        </div>
     </div>
 </div>
 {% endblock %}

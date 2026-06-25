@@ -21,18 +21,36 @@
             <th>Song</th>
             <th>Artist</th>
             <th>Played At</th>
+            <th style="width:60px;"></th>
         </tr>
     </thead>
     <tbody>
         {% for item in history %}
-        <tr>
-            <td>{{ item['title'] }}</td>
+        <tr data-history-id="{{ item['id'] }}">
+            <td><a href="/player/{{ item['id'] }}" style="color:inherit; text-decoration:none;">{{ item['title'] }}</a></td>
             <td>{{ item['artist'] }}</td>
             <td class="muted">{{ item['played_at'] }}</td>
+            <td>
+                <button class="btn btn-danger btn-sm del-history-btn" data-id="{{ item['id'] }}" title="Remove from history">Delete</button>
+            </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if page > 1 %}
+    <a href="/history?page={{ page - 1 }}" class="pagination-link">&laquo; Prev</a>
+    {% endif %}
+    {% for p in range(1, total_pages + 1) %}
+    <a href="/history?page={{ p }}" class="pagination-link {% if p == page %}active{% endif %}">{{ p }}</a>
+    {% endfor %}
+    {% if page < total_pages %}
+    <a href="/history?page={{ page + 1 }}" class="pagination-link">Next &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}
 
 {% if not history %}
 <div class="empty-state">
@@ -40,4 +58,27 @@
     <a href="/">Start listening</a>
 </div>
 {% endif %}
+
+<script>
+(function() {
+    document.querySelectorAll('.del-history-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var id = this.getAttribute('data-id');
+            var row = this.closest('tr');
+            if (!confirm('Remove this entry from history?')) return;
+            fetch('/delete_history/' + id, { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        row.style.transition = 'opacity 0.3s';
+                        row.style.opacity = '0';
+                        setTimeout(function() { row.remove(); }, 300);
+                    }
+                })
+                .catch(function(err) { console.error(err); });
+        });
+    });
+})();
+</script>
 {% endblock %}

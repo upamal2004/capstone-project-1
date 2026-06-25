@@ -2,10 +2,6 @@
 
 {% block title %}Profile — MusicApp{% endblock %}
 
-{% block head_extra %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-{% endblock %}
-
 {% block app_content %}
 <div class="page-header">
     <h1>Your Listening Profile</h1>
@@ -28,6 +24,55 @@
     <div class="stat-card">
         <div class="stat-card-label">Average Listening Energy</div>
         <div class="stat-card-value">{{ avg_energy }}</div>
+    </div>
+</div>
+
+<div class="top-section">
+    <div class="top-block">
+        <h3 class="top-block-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Your Top 3 Artists
+        </h3>
+        <div class="top-list">
+            {% for a in top_artists %}
+            <div class="top-item">
+                <div class="top-rank">{{ loop.index }}</div>
+                <div class="top-item-body">
+                    <span class="top-item-name">{{ a['artist'] }}</span>
+                    <span class="top-item-stat">{{ a['cnt'] }} plays</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding:16px 0;"><p>No listening history yet.</p></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="top-block">
+        <h3 class="top-block-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            Your Top 3 Tracks
+        </h3>
+        <div class="top-list">
+            {% for s in top_songs %}
+            <div class="top-item top-item-track">
+                <div class="top-rank">{{ loop.index }}</div>
+                {% set mood = 'happy' if s['energy'] >= 0.5 else 'relax' %}
+                {% if s['genre'] in ('Pop', 'Rock', 'Classical') %}
+                <img src="{{ url_for('static', filename='images/' ~ s['genre'] ~ ' ' ~ mood ~ '.jpg') }}" alt="" class="top-track-img">
+                {% else %}
+                <div class="top-track-img top-track-img-fallback">♪</div>
+                {% endif %}
+                <div class="top-item-body">
+                    <span class="top-item-name">{{ s['title'] }}</span>
+                    <span class="top-item-artist">{{ s['artist'] }}</span>
+                    <span class="top-item-stat">{{ s['cnt'] }} plays</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding:16px 0;"><p>No listening history yet.</p></div>
+            {% endfor %}
+        </div>
     </div>
 </div>
 
@@ -113,233 +158,113 @@
     <p style="color:var(--text-muted);">Your playlist is empty. <a href="/">Browse songs</a></p>
     {% endif %}
 </div>
-{% endblock %}
 
-{% block body %}
-{{ super() }}
+<div class="chart-section" style="margin-top: 24px; width: 100%;">
+    <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+        Like / Dislike Analysis
+    </h3>
+    <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:16px;">Genre breakdown of your liked and disliked songs</p>
+    {% if ld_genres %}
+    <canvas id="likeDislikeChart" style="max-height:280px;"></canvas>
+    <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:18px; justify-content:center;">
+        {% for s in like_songs %}
+        <span style="background:rgba(0,255,102,0.1); border:1px solid rgba(0,255,102,0.25); color:#00ff66; padding:4px 14px; border-radius:20px; font-size:0.78rem; white-space:nowrap;">{{ s['title'] }}</span>
+        {% endfor %}
+        {% for s in dislike_songs %}
+        <span style="background:rgba(255,51,68,0.1); border:1px solid rgba(255,51,68,0.25); color:#ff3344; padding:4px 14px; border-radius:20px; font-size:0.78rem; white-space:nowrap;">{{ s['title'] }}</span>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);">No likes or dislikes yet. <a href="/">Browse songs</a></p>
+    {% endif %}
+</div>
 <script>
-// Chart colors
 var colors = ['#1DB954', '#128C7E', '#3498db', '#9b59b6', '#e67e22', '#e74c3c', '#f1c40f'];
 var textColor = '#b3b3b3';
 var gridColor = 'rgba(255,255,255,0.06)';
 
-// 1. Genre Pie Chart
-new Chart(document.getElementById('genrePieChart'), {
-    type: 'pie',
-    data: {
-        labels: {{ chart_labels | tojson }},
-        datasets: [{
-            data: {{ chart_data | tojson }},
-            backgroundColor: colors,
-            borderColor: '#121212',
-            borderWidth: 2
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                position: 'bottom',
-                labels: { color: textColor, padding: 16, font: { family: 'Inter', size: 12 } }
-            }
-        }
-    }
-});
+function fetchAndRefreshCharts() {
+    if (typeof Chart === 'undefined') return;
 
-// 2. Weekly Trend Line Chart
-new Chart(document.getElementById('trendChart'), {
-    type: 'line',
-    data: {
-        labels: {{ trend_labels | tojson }},
-        datasets: [{
-            label: 'Songs Played',
-            data: {{ trend_data | tojson }},
-            borderColor: '#1DB954',
-            backgroundColor: 'rgba(29, 185, 84, 0.08)',
-            fill: true,
-            tension: 0.35,
-            pointBackgroundColor: '#1DB954',
-            pointBorderColor: '#121212',
-            pointBorderWidth: 2,
-            pointRadius: 4,
-            pointHoverRadius: 6
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            x: {
-                ticks: { color: textColor, font: { family: 'Inter', size: 11 } },
-                grid: { color: gridColor }
-            },
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    color: textColor,
-                    font: { family: 'Inter', size: 11 },
-                    stepSize: 1
-                },
-                grid: { color: gridColor }
-            }
-        },
-        plugins: {
-            legend: { display: false }
-        }
-    }
-});
+    fetch('/api/profile-analytics')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d) return;
 
-// 3. Genre vs Mood Correlation — Stacked Bar Chart
-new Chart(document.getElementById('correlationChart'), {
-    type: 'bar',
-    data: {
-        labels: {{ corr_genres | tojson }},
-        datasets: [
-            {
-                label: 'Happy / High Energy',
-                data: {{ corr_happy | tojson }},
-                backgroundColor: '#1DB954',
-                borderRadius: 0
-            },
-            {
-                label: 'Chill / Relax',
-                data: {{ corr_chill | tojson }},
-                backgroundColor: '#3498db',
-                borderRadius: 0
+            // Genre Pie Chart
+            if (window.myGenreChart) { window.myGenreChart.destroy(); }
+            var gpc = document.getElementById('genrePieChart');
+            if (gpc && d.genres) {
+                window.myGenreChart = new Chart(gpc, {
+                    type: 'pie',
+                    data: { labels: d.genres, datasets: [{ data: d.counts, backgroundColor: colors, borderColor: '#121212', borderWidth: 2 }] },
+                    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: textColor, padding: 16, font: { family: 'Inter', size: 12 } } } } }
+                });
             }
-        ]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            x: {
-                stacked: true,
-                ticks: { color: textColor, font: { family: 'Inter', size: 11 } },
-                grid: { display: false }
-            },
-            y: {
-                stacked: true,
-                beginAtZero: true,
-                ticks: {
-                    color: textColor,
-                    font: { family: 'Inter', size: 11 },
-                    stepSize: 1
-                },
-                grid: { color: gridColor }
-            }
-        },
-        plugins: {
-            legend: {
-                position: 'bottom',
-                labels: {
-                    color: textColor,
-                    padding: 16,
-                    font: { family: 'Inter', size: 12 },
-                    usePointStyle: true
-                }
-            }
-        }
-    }
-});
 
-// 4. Daily Vibe & Genre Evolution — Multi-Axis Line Chart
-var dailyCtx = document.getElementById('dailyChart');
-if (dailyCtx) {
-    var dailyLabels = {{ daily_dates | tojson }};
-    new Chart(dailyCtx, {
-        type: 'line',
-        data: {
-            labels: dailyLabels,
-            datasets: [{
-                label: 'Avg Mood Score',
-                data: {{ daily_energies | tojson }},
-                borderColor: '#1DB954',
-                backgroundColor: 'rgba(29, 185, 84, 0.1)',
-                fill: true,
-                tension: 0.35,
-                pointBackgroundColor: '#1DB954',
-                pointBorderColor: '#121212',
-                pointBorderWidth: 2,
-                pointRadius: 5,
-                pointHoverRadius: 8,
-                yAxisID: 'y'
-            }]
-        },
-        options: {
-            responsive: true,
-            interaction: {
-                mode: 'index',
-                intersect: false
-            },
-            scales: {
-                x: {
-                    ticks: { color: textColor, font: { family: 'Inter', size: 11 } },
-                    grid: { color: gridColor }
-                },
-                y: {
-                    beginAtZero: true,
-                    max: 1,
-                    ticks: {
-                        color: textColor,
-                        font: { family: 'Inter', size: 11 },
-                        callback: function(v) { return (v * 100).toFixed(0) + '%'; }
-                    },
-                    grid: { color: gridColor }
-                }
-            },
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        color: textColor,
-                        padding: 16,
-                        font: { family: 'Inter', size: 12 },
-                        usePointStyle: true
-                    }
-                },
-                tooltip: {
-                    backgroundColor: '#1A1A1A',
-                    titleColor: '#fff',
-                    bodyColor: '#b3b3b3',
-                    borderColor: '#2a2a2a',
-                    borderWidth: 1,
-                    padding: 12,
-                    cornerRadius: 8,
-                    callbacks: {
-                        afterBody: function(tooltipItems) {
-                            var idx = tooltipItems[0].dataIndex;
-                            return 'Top Genre: ' + ({{ daily_genres | tojson }})[idx];
-                        }
-                    }
-                }
+            // Trend Line Chart
+            if (window.myTrendChart) { window.myTrendChart.destroy(); }
+            var tc = document.getElementById('trendChart');
+            if (tc && d.trend) {
+                window.myTrendChart = new Chart(tc, {
+                    type: 'line',
+                    data: { labels: d.trend.labels, datasets: [{ label: 'Songs Played', data: d.trend.data, borderColor: '#1DB954', backgroundColor: 'rgba(29,185,84,0.08)', fill: true, tension: 0.35, pointBackgroundColor: '#1DB954', pointBorderColor: '#121212', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6 }] },
+                    options: { responsive: true, scales: { x: { ticks: { color: textColor, font: { family: 'Inter', size: 11 } }, grid: { color: gridColor } }, y: { beginAtZero: true, ticks: { color: textColor, font: { family: 'Inter', size: 11 }, stepSize: 1 }, grid: { color: gridColor } } }, plugins: { legend: { display: false } } }
+                });
             }
-        }
-    });
+
+            // Correlation Stacked Bar
+            if (window.myCorrChart) { window.myCorrChart.destroy(); }
+            var cc = document.getElementById('correlationChart');
+            if (cc && d.correlation) {
+                window.myCorrChart = new Chart(cc, {
+                    type: 'bar',
+                    data: { labels: d.correlation.genres, datasets: [{ label: 'Happy / High Energy', data: d.correlation.happy, backgroundColor: '#1DB954', borderRadius: 0 }, { label: 'Chill / Relax', data: d.correlation.chill, backgroundColor: '#3498db', borderRadius: 0 }] },
+                    options: { responsive: true, scales: { x: { stacked: true, ticks: { color: textColor, font: { family: 'Inter', size: 11 } }, grid: { display: false } }, y: { stacked: true, beginAtZero: true, ticks: { color: textColor, font: { family: 'Inter', size: 11 }, stepSize: 1 }, grid: { color: gridColor } } }, plugins: { legend: { position: 'bottom', labels: { color: textColor, padding: 16, font: { family: 'Inter', size: 12 }, usePointStyle: true } } } }
+                });
+            }
+
+            // Daily Chart
+            if (window.myDailyChart) { window.myDailyChart.destroy(); }
+            var dc = document.getElementById('dailyChart');
+            if (dc && d.daily) {
+                window.myDailyChart = new Chart(dc, {
+                    type: 'line',
+                    data: { labels: d.daily.dates, datasets: [{ label: 'Avg Mood Score', data: d.daily.energies, borderColor: '#1DB954', backgroundColor: 'rgba(29,185,84,0.1)', fill: true, tension: 0.35, pointBackgroundColor: '#1DB954', pointBorderColor: '#121212', pointBorderWidth: 2, pointRadius: 5, pointHoverRadius: 8, yAxisID: 'y' }] },
+                    options: { responsive: true, interaction: { mode: 'index', intersect: false }, scales: { x: { ticks: { color: textColor, font: { family: 'Inter', size: 11 } }, grid: { color: gridColor } }, y: { beginAtZero: true, max: 1, ticks: { color: textColor, font: { family: 'Inter', size: 11 }, callback: function(v) { return (v * 100).toFixed(0) + '%'; } }, grid: { color: gridColor } } }, plugins: { legend: { position: 'bottom', labels: { color: textColor, padding: 16, font: { family: 'Inter', size: 12 }, usePointStyle: true } }, tooltip: { backgroundColor: '#1A1A1A', titleColor: '#fff', bodyColor: '#b3b3b3', borderColor: '#2a2a2a', borderWidth: 1, padding: 12, cornerRadius: 8, callbacks: { afterBody: function(ti) { var g = d.daily.genres; return g && g[ti[0].dataIndex] ? 'Top Genre: ' + g[ti[0].dataIndex] : ''; } } } } }
+                });
+            }
+
+            // Like/Dislike Bar
+            if (window.myLikeDislikeChart) { window.myLikeDislikeChart.destroy(); }
+            var ldc = document.getElementById('likeDislikeChart');
+            if (ldc && d.likeDislike) {
+                window.myLikeDislikeChart = new Chart(ldc, {
+                    type: 'bar',
+                    data: { labels: d.likeDislike.genres, datasets: [{ label: 'Likes', data: d.likeDislike.likes, backgroundColor: '#00ff66', borderRadius: 4 }, { label: 'Dislikes', data: d.likeDislike.dislikes, backgroundColor: '#ff3344', borderRadius: 4 }] },
+                    options: { indexAxis: 'y', responsive: true, scales: { x: { stacked: true, ticks: { color: textColor, font: { family: 'Inter', size: 11 }, stepSize: 1 }, grid: { color: gridColor } }, y: { stacked: true, ticks: { color: textColor, font: { family: 'Inter', size: 11 } }, grid: { display: false } } }, plugins: { legend: { position: 'bottom', labels: { color: textColor, padding: 16, font: { family: 'Inter', size: 12 }, usePointStyle: true } } } }
+                });
+            }
+
+            // Playlist Genre Doughnut
+            if (window.myPlaylistChart) { window.myPlaylistChart.destroy(); }
+            var pgc = document.getElementById('playlistGenreChart');
+            if (pgc && d.playlistGenre) {
+                var plColors = ['#1DB954', '#E74C3C', '#3498DB', '#F39C12', '#9B59B6', '#1ABC9C', '#E67E22', '#2ECC71'];
+                window.myPlaylistChart = new Chart(pgc, {
+                    type: 'doughnut',
+                    data: { labels: d.playlistGenre.genres, datasets: [{ data: d.playlistGenre.counts, backgroundColor: plColors, borderColor: '#121212', borderWidth: 2 }] },
+                    options: { responsive: true, cutout: '65%', plugins: { legend: { display: false } } }
+                });
+            }
+        })
+        .catch(function() {});
 }
-</script>
 
-<script>
-// Playlist Genre Doughnut Chart
-if (document.getElementById('playlistGenreChart')) {
-    var plColors = ['#1DB954', '#E74C3C', '#3498DB', '#F39C12', '#9B59B6', '#1ABC9C', '#E67E22', '#2ECC71'];
-    new Chart(document.getElementById('playlistGenreChart'), {
-        type: 'doughnut',
-        data: {
-            labels: {{ pl_genres | tojson }},
-            datasets: [{
-                data: {{ pl_counts | tojson }},
-                backgroundColor: plColors,
-                borderColor: '#121212',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            cutout: '65%',
-            plugins: {
-                legend: { display: false }
-            }
-        }
-    });
-}
+fetchAndRefreshCharts();
+window._onContentSwapped = fetchAndRefreshCharts;
 </script>
 {% endblock %}
+
+{% block body %}{{ super() }}{% endblock %}

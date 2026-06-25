@@ -1,76 +1,151 @@
 {% extends "base_app.html" %}
 
-{% block title %}My Playlist — MusicApp{% endblock %}
+{% block title %}My Playlists — MusicApp{% endblock %}
 
 {% block app_content %}
-<div class="page-header">
-    <h1>My Playlist</h1>
-    <p>Your handpicked favorite tracks, stored in one place.</p>
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <div>
+        <h1>My Playlists</h1>
+        <p>Organize your favorite tracks into custom collections.</p>
+    </div>
+    <button class="btn btn-primary" id="toggle-playlist-form-btn" style="white-space:nowrap;">
+        + New Playlist
+    </button>
 </div>
 
-<div class="song-grid">
-    {% for song in songs %}
-    <div class="song-card">
-        <div class="song-cover">
-            {% set mood = 'happy' if song['energy'] >= 0.5 else 'relax' %}
-            {% if song['genre'] in ('Pop', 'Rock', 'Classical') %}
-                <img src="{{ url_for('static', filename='images/' ~ song['genre'] ~ ' ' ~ mood ~ '.jpg') }}" alt="{{ song['genre'] }}" class="cover-img">
-            {% else %}
-                <div class="cover-fallback">♪</div>
-            {% endif %}
-        </div>
-        <div class="song-info">
-            <span class="song-title">{{ song['title'] }}</span>
-            <span class="song-artist">{{ song['artist'] }}</span>
-            <span class="song-genre">{{ song['genre'] }}</span>
-        </div>
-        <div class="song-audio-player">
-            <audio id="audio-{{ loop.index }}">
-                <source src="{{ url_for('static', filename='songs/' + song['file_path']) }}" type="audio/mpeg">
-            </audio>
-            <button class="btn-play" onclick="togglePlay('audio-{{ loop.index }}', this, '{{ song['id'] }}')">
-                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            </button>
-            <form action="/remove_from_playlist/{{ song['id'] }}" method="POST" style="margin:0 0 0 auto;">
-                <button type="submit" class="btn btn-danger" style="padding:6px 14px; font-size:0.78rem;">Remove</button>
+<form id="create-playlist-form" action="/create_playlist" method="POST" style="display:none; margin-bottom:24px; padding:16px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:var(--radius-md);">
+    <div style="display:flex; gap:10px; align-items:center;">
+        <input type="text" name="name" placeholder="Playlist name..." required style="flex:1; padding:10px 14px; border-radius:8px; border:1px solid var(--border-subtle); background:var(--bg-input); color:var(--text-primary); font-size:0.9rem; outline:none;">
+        <button type="submit" class="btn btn-primary" style="padding:10px 20px;">Create</button>
+        <button type="button" class="btn" id="cancel-playlist-form-btn" style="padding:10px 16px; background:transparent; color:var(--text-secondary);">Cancel</button>
+    </div>
+</form>
+
+<script>
+(function() {
+    var toggleBtn = document.getElementById('toggle-playlist-form-btn');
+    var form = document.getElementById('create-playlist-form');
+    var cancelBtn = document.getElementById('cancel-playlist-form-btn');
+    toggleBtn.addEventListener('click', function() {
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    });
+    cancelBtn.addEventListener('click', function() {
+        form.style.display = 'none';
+    });
+})();
+</script>
+
+<div class="playlist-page playlists-layout" style="display:flex; gap:24px; align-items:flex-start;">
+    <!-- Sidebar: list of playlists -->
+    <div class="playlist-sidebar" style="flex:0 0 260px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:var(--radius-md); padding:16px;">
+        <h3 style="font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-secondary); margin:0 0 12px 0;">Your Playlists</h3>
+        {% if playlists %}
+            {% for pl in playlists %}
+            <a href="/playlist/{{ pl['id'] }}" class="playlist-sidebar-item {% if active_playlist and active_playlist['id'] == pl['id'] %}active{% endif %}" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; text-decoration:none; color:var(--text-primary); transition:background 0.2s; {% if active_playlist and active_playlist['id'] == pl['id'] %}background:rgba(0,255,102,0.08);{% endif %}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; color:var(--accent-green);"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:0.9rem; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ pl['name'] }}</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted);" class="sidebar-song-count" data-playlist-id="{{ pl['id'] }}">{{ pl['song_count'] }} songs</div>
+                    </div>
+                </a>
+            {% endfor %}
+        {% else %}
+            <p style="color:var(--text-muted); font-size:0.85rem;">No playlists yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Main: songs in active playlist -->
+    <div class="playlist-main" style="flex:1; min-width:0;">
+        {% if active_playlist %}
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+            <div>
+                <h2 style="margin:0; font-size:1.5rem;">{{ active_playlist['name'] }}</h2>
+                <p style="color:var(--text-secondary); font-size:0.85rem; margin:4px 0 0 0;" class="playlist-subtitle-count">{{ songs|length }} song{% if songs|length != 1 %}s{% endif %}</p>
+            </div>
+            <form action="/delete_playlist/{{ active_playlist['id'] }}" method="POST" onsubmit="return confirm('Delete this playlist?')">
+                <button type="submit" class="btn" style="background:transparent; color:var(--accent-red); border:1px solid var(--border-subtle); padding:6px 14px; font-size:0.8rem;">Delete</button>
             </form>
         </div>
+
+        <div class="song-grid">
+            {% for song in songs %}
+            <div class="song-card">
+                <div class="song-cover">
+                    {% set mood = 'happy' if song['energy'] >= 0.5 else 'relax' %}
+                    {% if song['genre'] in ('Pop', 'Rock', 'Classical') %}
+                        <img src="{{ url_for('static', filename='images/' ~ song['genre'] ~ ' ' ~ mood ~ '.jpg') }}" alt="{{ song['genre'] }}" class="cover-img">
+                    {% else %}
+                        <div class="cover-fallback">♪</div>
+                    {% endif %}
+                    <div class="play-overlay">
+                        <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}?playlist_id={{ active_playlist['id'] }}')">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="song-info">
+                    <a href="/player/{{ song['id'] }}?playlist_id={{ active_playlist['id'] }}" class="song-title" style="text-decoration:none; color:inherit;">{{ song['title'] }}</a>
+                    <span class="song-artist">{{ song['artist'] }}</span>
+                    <span class="song-genre">{{ song['genre'] }}</span>
+                </div>
+                <div class="song-card-actions">
+                    <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}?playlist_id={{ active_playlist['id'] }}')">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </button>
+                    <button class="playlist-add-btn" data-playlist-id="{{ active_playlist['id'] }}" data-song-id="{{ song['id'] }}" title="Remove from playlist">×</button>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state" style="grid-column:1/-1;">
+                <p>This playlist is empty</p>
+                <a href="/">Browse Songs</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="margin-top:40px;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-muted); margin-bottom:12px;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            <p>Select a playlist from the sidebar or create a new one</p>
+        </div>
+        {% endif %}
     </div>
-    {% else %}
-    <div class="empty-state">
-        <p>Your playlist is empty</p>
-        <a href="/">Browse Songs</a>
-    </div>
-    {% endfor %}
 </div>
+
+<script>
+(function() {
+    document.querySelectorAll('.playlist-page .playlist-add-btn[data-playlist-id]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var playlistId = this.getAttribute('data-playlist-id');
+            var songId = this.getAttribute('data-song-id');
+            var card = this.closest('.song-card');
+            if (!confirm('Remove this song from the playlist?')) return;
+            fetch('/remove_from_playlist/' + playlistId + '/' + songId, { method: 'POST' })
+                .then(function(r) {
+                    if (!r.ok) throw new Error('Failed to remove');
+                    card.style.transition = 'opacity 0.3s';
+                    card.style.opacity = '0';
+                    setTimeout(function() { card.remove(); }, 300);
+                    // Update sidebar song count
+                    var sidebarCount = document.querySelector('.sidebar-song-count[data-playlist-id="' + playlistId + '"]');
+                    if (sidebarCount) {
+                        var cur = parseInt(sidebarCount.innerText) || 0;
+                        if (cur > 0) sidebarCount.innerText = (cur - 1) + ' songs';
+                    }
+                    // Update main subtitle count
+                    var mainCount = document.querySelector('.playlist-subtitle-count');
+                    if (mainCount) {
+                        var curMain = parseInt(mainCount.innerText) || 0;
+                        if (curMain > 0) mainCount.innerText = (curMain - 1) + ' song' + (curMain - 1 === 1 ? '' : 's');
+                    }
+                })
+                .catch(function(err) { alert(err.message); });
+        });
+    });
+})();
+</script>
 {% endblock %}
 
 {% block body %}
 {{ super() }}
-<script>
-function togglePlay(audioId, btn, songId) {
-    var audio = document.getElementById(audioId);
-    var allAudios = document.querySelectorAll('audio');
-    var allButtons = document.querySelectorAll('.btn-play');
-    allAudios.forEach(function(a) { if (a !== audio) a.pause(); });
-    allButtons.forEach(function(b) {
-        if (b !== btn) {
-            b.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
-        }
-    });
-
-    if (audio.paused) {
-        audio.play();
-        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
-        fetch('/add_to_history', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ song_id: songId })
-        });
-    } else {
-        audio.pause();
-        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
-    }
-}
-</script>
 {% endblock %}

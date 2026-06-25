@@ -4,26 +4,49 @@
 
 {% block body %}
 <div class="auth-page">
-    <div class="auth-card">
-        <div class="auth-logo">
-            <span class="logo-icon">♪</span>
-            MusicApp
+    <div class="auth-split">
+        <div class="auth-promo">
+            <div class="auth-logo">
+                <span class="logo-icon">♪</span>
+                MusicApp
+            </div>
+            <h2 class="promo-heading">Your Music,<br>Reimagined.</h2>
+            <ul class="promo-list">
+                <li>
+                    <span class="promo-icon" style="color:#00ff66;">▶</span>
+                    <div><strong>Persistent Audio Player</strong><br><span class="promo-desc">Never stop the music — seamless playback across every page.</span></div>
+                </li>
+                <li>
+                    <span class="promo-icon" style="color:#00ff66;">♡</span>
+                    <div><strong>Smart Like / Dislike</strong><br><span class="promo-desc">Train your recommendations with one tap.</span></div>
+                </li>
+                <li>
+                    <span class="promo-icon" style="color:#00ff66;">≡</span>
+                    <div><strong>Dynamic Playlists</strong><br><span class="promo-desc">Create, organize, and discover your perfect sets.</span></div>
+                </li>
+                <li>
+                    <span class="promo-icon" style="color:#00ff66;">📊</span>
+                    <div><strong>Rich Analytics</strong><br><span class="promo-desc">Visualize your taste with genre trends and mood charts.</span></div>
+                </li>
+            </ul>
         </div>
-        <p class="auth-subtitle">Create your account and start listening.</p>
+        <div class="auth-card">
+            <p class="auth-subtitle">Create your account and start listening.</p>
 
-        {% if error %}
-        <div class="alert alert-error">{{ error }}</div>
-        {% endif %}
+            {% if error %}
+            <div class="alert alert-error">{{ error }}</div>
+            {% endif %}
 
-        <form class="auth-form" action="/register" method="POST">
-            <input type="text" name="username" placeholder="Choose a username" required>
-            <input type="password" name="password" placeholder="Create a password" required>
-            <button type="submit" class="btn btn-primary">Create Account</button>
-        </form>
+            <form class="auth-form" action="/register" method="POST">
+                <input type="text" name="username" placeholder="Choose a username" required>
+                <input type="password" name="password" placeholder="Create a password" required>
+                <button type="submit" class="btn btn-primary">Create Account</button>
+            </form>
 
-        <p class="auth-footer">
-            Already have an account? <a href="/login">Sign in</a>
-        </p>
+            <p class="auth-footer">
+                Already have an account? <a href="/login">Sign in</a>
+            </p>
+        </div>
     </div>
 </div>
 {% endblock %}

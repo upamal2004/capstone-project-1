@@ -13,8 +13,9 @@
                 <button type="submit">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </button>
-                <input type="text" name="query" placeholder="What do you want to listen to?" autocomplete="off" required>
+                <input type="text" name="query" id="search-input" placeholder="What do you want to listen to?" autocomplete="off" required>
             </form>
+            <div class="search-suggestions" id="search-suggestions"></div>
         </div>
         <div class="mood-filter mood-filter-banner">
             <div class="mood-filter-header">
@@ -24,11 +25,13 @@
             <div class="mood-filter-options">
                 <form action="/recommend" method="GET" style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
                     <select name="genre" class="mood-select">
+                        <option value="all">All Genres</option>
                         <option value="Pop">Pop</option>
                         <option value="Rock">Rock</option>
                         <option value="Classical">Classical</option>
                     </select>
                     <select name="mood" class="mood-select">
+                        <option value="all">All Moods</option>
                         <option value="high">Happy (High Energy)</option>
                         <option value="low">Relax (Low Energy)</option>
                     </select>
@@ -39,11 +42,13 @@
     </div>
 </div>
 
+{% if not is_filtered %}
+
 {% if time_songs %}
 <hr class="section-divider">
 <h2 style="font-size:1.4rem; font-weight:700; margin-bottom:6px;">{{ time_title }}</h2>
-<p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:20px;">Curated picks for this time of day</p>
-<div class="song-grid">
+<p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:12px;">Curated picks for this time of day</p>
+<div class="song-row">
     {% for song in time_songs %}
     <div class="song-card">
         <div class="song-cover">
@@ -54,7 +59,7 @@
                 <div class="cover-fallback">♪</div>
             {% endif %}
             <div class="play-overlay">
-                <button class="btn-play" onclick="location.href='/player/{{ song['id'] }}'">
+                <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}')">
                     <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 </button>
             </div>
@@ -65,20 +70,21 @@
             <span class="song-genre">{{ song['genre'] }}</span>
         </div>
         <div class="song-card-actions">
-            <button class="btn-play" onclick="location.href='/player/{{ song['id'] }}'">
+            <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}')">
                 <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             </button>
-            <button class="playlist-add-btn add-to-playlist-btn" data-song-id="{{ song['id'] }}" title="Add to playlist">+</button>
+            {% if song.is_in_playlist %}<button class="playlist-add-btn add-to-playlist-btn added" data-song-id="{{ song['id'] }}" title="In playlist">✓</button>{% else %}<button class="playlist-add-btn add-to-playlist-btn" data-song-id="{{ song['id'] }}" title="Add to playlist">+</button>{% endif %}
         </div>
     </div>
     {% endfor %}
 </div>
 {% endif %}
 
+<hr class="section-divider">
 <h2 style="font-size:1.4rem; font-weight:700; margin-bottom:6px;">Recommended for You</h2>
-<p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:20px;">{% if personalized %}Based on your recent listening habits{% else %}Browse our full collection{% endif %}</p>
+<p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:12px;">{% if personalized %}Based on your recent listening habits{% else %}Browse our full collection{% endif %}</p>
 
-<div class="song-grid">
+<div class="song-row">
     {% for song in songs %}
     <div class="song-card">
         <div class="song-cover">
@@ -89,7 +95,7 @@
                 <div class="cover-fallback">♪</div>
             {% endif %}
             <div class="play-overlay">
-                <button class="btn-play" onclick="location.href='/player/{{ song['id'] }}'">
+                <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}')">
                     <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 </button>
             </div>
@@ -100,10 +106,10 @@
             <span class="song-genre">{{ song['genre'] }}</span>
         </div>
         <div class="song-card-actions">
-            <button class="btn-play" onclick="location.href='/player/{{ song['id'] }}'">
+            <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}')">
                 <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             </button>
-            <button class="playlist-add-btn add-to-playlist-btn" data-song-id="{{ song['id'] }}" title="Add to playlist">+</button>
+            {% if song.is_in_playlist %}<button class="playlist-add-btn add-to-playlist-btn added" data-song-id="{{ song['id'] }}" title="In playlist">✓</button>{% else %}<button class="playlist-add-btn add-to-playlist-btn" data-song-id="{{ song['id'] }}" title="Add to playlist">+</button>{% endif %}
         </div>
     </div>
     {% else %}
@@ -113,25 +119,256 @@
     </div>
     {% endfor %}
 </div>
+
+<hr class="section-divider">
+<h2 style="font-size:1.4rem; font-weight:700; margin-bottom:6px;">Your Liked Songs</h2>
+<p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:12px;">Tracks you've shown love to</p>
+
+<div class="song-row">
+    {% for song in liked_songs %}
+    <div class="song-card">
+        <div class="song-cover">
+            {% set mood = 'happy' if song['energy'] >= 0.5 else 'relax' %}
+            {% if song['genre'] in ('Pop', 'Rock', 'Classical') %}
+                <img src="{{ url_for('static', filename='images/' ~ song['genre'] ~ ' ' ~ mood ~ '.jpg') }}" alt="{{ song['genre'] }}" class="cover-img">
+            {% else %}
+                <div class="cover-fallback">♪</div>
+            {% endif %}
+            <div class="play-overlay">
+                <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}')">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="song-info">
+            <a href="/player/{{ song['id'] }}" class="song-title" style="text-decoration:none; color:inherit;">{{ song['title'] }}</a>
+            <span class="song-artist">{{ song['artist'] }}</span>
+            <span class="song-genre">{{ song['genre'] }}</span>
+        </div>
+        <div class="song-card-actions">
+            <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            {% if song.is_in_playlist %}<button class="playlist-add-btn add-to-playlist-btn added" data-song-id="{{ song['id'] }}" title="In playlist">✓</button>{% else %}<button class="playlist-add-btn add-to-playlist-btn" data-song-id="{{ song['id'] }}" title="Add to playlist">+</button>{% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>Your liked songs will appear here!</p>
+    </div>
+    {% endfor %}
+</div>
+
+<hr class="section-divider">
+<h2 style="font-size:1.4rem; font-weight:700; margin-bottom:6px;">Based on Your Vibe</h2>
+<p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:12px;">Energy matched to your listening mood</p>
+
+<div class="song-row">
+    {% for song in energy_recommended_songs %}
+    <div class="song-card">
+        <div class="song-cover">
+            {% set mood = 'happy' if song['energy'] >= 0.5 else 'relax' %}
+            {% if song['genre'] in ('Pop', 'Rock', 'Classical') %}
+                <img src="{{ url_for('static', filename='images/' ~ song['genre'] ~ ' ' ~ mood ~ '.jpg') }}" alt="{{ song['genre'] }}" class="cover-img">
+            {% else %}
+                <div class="cover-fallback">♪</div>
+            {% endif %}
+            <div class="play-overlay">
+                <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}')">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="song-info">
+            <a href="/player/{{ song['id'] }}" class="song-title" style="text-decoration:none; color:inherit;">{{ song['title'] }}</a>
+            <span class="song-artist">{{ song['artist'] }}</span>
+            <span class="song-genre">{{ song['genre'] }}</span>
+        </div>
+        <div class="song-card-actions">
+            <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            {% if song.is_in_playlist %}<button class="playlist-add-btn add-to-playlist-btn added" data-song-id="{{ song['id'] }}" title="In playlist">✓</button>{% else %}<button class="playlist-add-btn add-to-playlist-btn" data-song-id="{{ song['id'] }}" title="Add to playlist">+</button>{% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No vibe-matched songs found!</p>
+    </div>
+    {% endfor %}
+</div>
+
+<hr class="section-divider">
+<h2 style="font-size:1.4rem; font-weight:700; margin-bottom:6px;">Recommended Artists</h2>
+<p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:12px;">Based on your listening history</p>
+
+<div class="song-row">
+    {% for artist in recommended_artists %}
+    <a href="/search?query={{ artist['artist'] | urlencode }}" class="artist-card">
+        <div class="artist-avatar">{{ artist['artist'][0] | upper }}</div>
+        <span class="artist-name">{{ artist['artist'] }}</span>
+    </a>
+    {% else %}
+    <div class="empty-state">
+        <p>Your recommended artists will appear here!</p>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+
+<hr class="section-divider">
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
+    <h2 style="font-size:1.4rem; font-weight:700; margin:0;">Your Mood Match Results</h2>
+    <a href="/" class="btn btn-primary" style="font-size:0.8rem; padding:6px 14px;">Clear Filter</a>
+</div>
+
+<div class="song-row song-row-vertical">
+    {% for song in songs %}
+    <div class="song-card">
+        <div class="song-cover">
+            {% set mood = 'happy' if song['energy'] >= 0.5 else 'relax' %}
+            {% if song['genre'] in ('Pop', 'Rock', 'Classical') %}
+                <img src="{{ url_for('static', filename='images/' ~ song['genre'] ~ ' ' ~ mood ~ '.jpg') }}" alt="{{ song['genre'] }}" class="cover-img">
+            {% else %}
+                <div class="cover-fallback">♪</div>
+            {% endif %}
+            <div class="play-overlay">
+                <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}')">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="song-info">
+            <a href="/player/{{ song['id'] }}" class="song-title" style="text-decoration:none; color:inherit;">{{ song['title'] }}</a>
+            <span class="song-artist">{{ song['artist'] }}</span>
+            <span class="song-genre">{{ song['genre'] }}</span>
+        </div>
+        <div class="song-card-actions">
+            <button class="btn-play" onclick="navigateTo('/player/{{ song['id'] }}')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            {% if song.is_in_playlist %}<button class="playlist-add-btn add-to-playlist-btn added" data-song-id="{{ song['id'] }}" title="In playlist">✓</button>{% else %}<button class="playlist-add-btn add-to-playlist-btn" data-song-id="{{ song['id'] }}" title="Add to playlist">+</button>{% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No songs match your filter.</p>
+        <a href="/">Try a different combination</a>
+    </div>
+    {% endfor %}
+</div>
+
+{% endif %}
+
+<script>
+// Hijack Recommend form — fetch filtered songs via AJAX, no page reload
+(function() {
+    var form = document.querySelector('.mood-filter-options form');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var params = new URLSearchParams(new FormData(form));
+        fetch(form.action + '?' + params.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+            var parser = new DOMParser();
+            var doc = parser.parseFromString(html, 'text/html');
+            var newContent = doc.querySelector('.main-content');
+            var newTitle = doc.querySelector('title');
+            var mainContent = document.querySelector('.main-content');
+            if (newContent && mainContent) {
+                mainContent.innerHTML = newContent.innerHTML;
+                if (newTitle) document.title = newTitle.textContent;
+                history.pushState({ url: form.action + '?' + params.toString() }, '', form.action + '?' + params.toString());
+                // Re-run any inline scripts in the new content
+                mainContent.querySelectorAll('script').forEach(function(oldScript) {
+                    if (oldScript.type && oldScript.type !== 'text/javascript' && oldScript.type !== '') return;
+                    var newScript = document.createElement('script');
+                    if (oldScript.src) { newScript.src = oldScript.src; }
+                    else { newScript.textContent = oldScript.textContent; }
+                    oldScript.replaceWith(newScript);
+                });
+                if (typeof window._onContentSwapped === 'function') window._onContentSwapped();
+            }
+        })
+        .catch(function() { window.location.href = form.action + '?' + params.toString(); });
+    });
+})();
+</script>
+<script>
+document.querySelectorAll('.add-to-playlist-btn').forEach(function(button) {
+    button.addEventListener('click', function(e) {
+        e.preventDefault();
+        var songId = this.getAttribute('data-song-id');
+        fetch('/add_to_playlist/' + songId, { method: 'POST' })
+        .then(function(r) {
+            if (!r.ok) return r.json().then(function(d) { throw new Error(d.message || 'Error'); });
+            return r.json();
+        })
+        .then(function(data) {
+            if (data.success) {
+                this.textContent = '\u2713';
+                this.classList.add('added');
+                this.title = 'In playlist';
+            }
+        }.bind(this))
+        .catch(function(err) { console.error(err); });
+    });
+});
+
+// Search suggestions
+(function() {
+    var input = document.getElementById('search-input');
+    var container = document.getElementById('search-suggestions');
+    if (!input || !container) return;
+    var timer;
+
+    input.addEventListener('input', function() {
+        clearTimeout(timer);
+        var val = this.value.trim();
+        if (val.length < 1) { container.innerHTML = ''; container.classList.remove('active'); return; }
+        timer = setTimeout(function() {
+            fetch('/search_suggestions?query=' + encodeURIComponent(val))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.suggestions || data.suggestions.length === 0) {
+                        container.innerHTML = ''; container.classList.remove('active'); return;
+                    }
+                    var html = '';
+                    data.suggestions.forEach(function(s) {
+                        var img = s.image_url
+                            ? '<img src="' + s.image_url + '" class="sug-img" alt="">'
+                            : '<div class="sug-img-fallback">♪</div>';
+                        html += '<a href="/player/' + s.id + '" class="sug-item">'
+                            + img
+                            + '<div class="sug-info"><span class="sug-title">' + escapeHtml(s.title) + '</span><span class="sug-artist">' + escapeHtml(s.artist) + '</span></div>'
+                            + '</a>';
+                    });
+                    container.innerHTML = html;
+                    container.classList.add('active');
+                })
+                .catch(function() {});
+        }, 200);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!container.contains(e.target) && e.target !== input) {
+            container.classList.remove('active');
+        }
+    });
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+})();
+</script>
 {% endblock %}
 
 {% block body %}
 {{ super() }}
-<script>
-document.querySelectorAll('.add-to-playlist-btn').forEach(button => {
-    button.addEventListener('click', function(e) {
-        e.preventDefault();
-        const songId = this.getAttribute('data-song-id');
-        fetch(`/add_to_playlist/${songId}`, { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                this.textContent = '✓';
-                this.style.color = '#1DB954';
-            }
-        })
-        .catch(err => console.error(err));
-    });
-});
-</script>
 {% endblock %}
